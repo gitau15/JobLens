@@ -63,10 +63,10 @@ The application will be available at http://localhost:5173
 2. Go to [Vercel](https://vercel.com) and sign in
 3. Click "New Project" and import your repository
 4. Set the following configuration:
-   - Framework Preset: `Vite`
-   - Root Directory: `frontend`
+   - Framework Preset: `Other`
    - Build Command: `npm run build`
    - Output Directory: `dist`
+   - Install Command: `npm install`
 5. Add your environment variables in the Vercel dashboard
 6. Click "Deploy"
 
