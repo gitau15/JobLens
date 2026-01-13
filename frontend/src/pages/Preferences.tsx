@@ -10,8 +10,22 @@ interface Preferences {
   experienceLevel: 'entry' | 'mid' | 'senior' | 'executive';
 }
 
+// Mapping between UI values and database values
+const mapRemotePreferenceToDB = (uiValue: 'any' | 'only' | 'no'): string => {
+  return uiValue === 'only' ? 'remote' :
+         uiValue === 'no' ? 'onsite' :
+         uiValue === 'any' ? 'either' : 'either';
+};
+
+const mapRemotePreferenceFromDB = (dbValue: string): 'any' | 'only' | 'no' => {
+  return dbValue === 'remote' ? 'only' :
+         dbValue === 'onsite' ? 'no' :
+         dbValue === 'hybrid' ? 'any' :
+         dbValue === 'either' ? 'any' : 'any';
+};
+
 const Preferences = () => {
-  const { user, updateUser } = useAuth();
+  const { user, getUserPreferences, updateUserPreferences } = useAuth();
   const [preferences, setPreferences] = useState<Preferences>({
     location: '',
     remotePreference: 'any',
@@ -25,10 +39,29 @@ const Preferences = () => {
 
   // Load user preferences when component mounts
   useEffect(() => {
-    if (user?.preferences) {
-      setPreferences(JSON.parse(user.preferences));
+    const loadPreferences = async () => {
+      try {
+        const prefData = await getUserPreferences();
+        if (prefData) {
+          // Map the database fields to our Preferences interface
+          setPreferences({
+            location: prefData.location_preference || '',
+            remotePreference: mapRemotePreferenceFromDB(prefData.remote_preference),
+            jobTypes: prefData.job_types || [],
+            minSalary: prefData.min_salary || 0,
+            industries: prefData.industries || [],
+            experienceLevel: prefData.experience_level || 'mid'
+          });
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
+      }
+    };
+    
+    if (user) {
+      loadPreferences();
     }
-  }, [user]);
+  }, [user, getUserPreferences]);
 
   const handleChange = (field: keyof Preferences, value: any) => {
     setPreferences(prev => ({
@@ -61,9 +94,14 @@ const Preferences = () => {
     setMessage('');
 
     try {
-      // Save preferences to user profile
-      await updateUser({
-        preferences: JSON.stringify(preferences)
+      // Convert our Preferences interface to the database format
+      await updateUserPreferences({
+        location_preference: preferences.location,
+        remote_preference: mapRemotePreferenceToDB(preferences.remotePreference),
+        job_types: preferences.jobTypes,
+        min_salary: preferences.minSalary,
+        industries: preferences.industries,
+        experience_level: preferences.experienceLevel
       });
       setMessage('Preferences saved successfully!');
     } catch (err) {

@@ -31,13 +31,18 @@ const JobListings = () => {
       try {
         setLoading(true);
         
-        // In a real implementation, we would get the user's CV embedding
-        // For now, we'll use a placeholder embedding
-        // TODO: Implement CV upload and processing
-        const placeholderEmbedding = Array(384).fill(0.1); // Placeholder embedding
+        // Get user's CV embedding if available, otherwise use a placeholder
+        let cvEmbedding;
+        if (user) {
+          // TODO: Implement API call to fetch user's CV embedding from backend
+          // For now, we'll still use a placeholder, but in production this would fetch the actual embedding
+          cvEmbedding = Array(384).fill(0.1); // Placeholder - should fetch from user's profile
+        } else {
+          cvEmbedding = Array(384).fill(0.1); // Placeholder embedding
+        }
         
         const response = await api.matcher.matchCV({
-          cv_embedding: placeholderEmbedding,
+          cv_embedding: cvEmbedding,
           limit: 20,
           filters: {
             location: filters.location || undefined,

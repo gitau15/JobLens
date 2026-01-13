@@ -35,8 +35,8 @@ const Profile = () => {
             id="email"
             type="email"
             value={email}
-            disabled
-            readOnly
+            onChange={(e) => setEmail(e.target.value)}
+            required
           />
         </div>
         <div className="form-group">
