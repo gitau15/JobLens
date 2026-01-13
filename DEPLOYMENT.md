@@ -23,11 +23,7 @@ JobLens is a full-stack application with:
 1. Push your code to a GitHub repository
 2. Go to [Vercel](https://vercel.com) and sign in
 3. Click "New Project" and import your repository
-4. Set the following configuration:
-   - Framework Preset: `Other`
-   - Build Command: `npm run build`
-   - Output Directory: `dist`
-   - Install Command: `npm install`
+4. Vercel will automatically detect it's a Vite project
 5. Add environment variables in the Vercel dashboard:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
