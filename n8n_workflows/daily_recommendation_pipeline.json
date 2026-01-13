@@ -1,0 +1,492 @@
+{
+  "name": "Daily Recommendation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "id": "schedule-trigger-daily-recommendation",
+      "name": "Schedule Trigger - Daily Recommendations"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public.users",
+          "mode": "list",
+          "cachedResultName": "public.users",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.users",
+          "mode": "list",
+          "cachedResultName": "users",
+          "cachedResultUrl": ""
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        300
+      ],
+      "id": "postgres-fetch-active-users",
+      "name": "Fetch Active Users",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process each user and prepare for CV embedding\nconst users = $input.all();\n\nconst processedUsers = [];\n\nfor (const user of users) {\n  if (user.json) {\n    processedUsers.push({\n      json: {\n        user_id: user.json.id,\n        email: user.json.email,\n        telegram_chat_id: user.json.telegram_chat_id,\n        preferences: user.json.preferences\n      }\n    });\n  }\n}\n\nreturn processedUsers;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ],
+      "id": "function-process-users",
+      "name": "Process Users"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public.cvs",
+          "mode": "list",
+          "cachedResultName": "public.cvs",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.cvs",
+          "mode": "list",
+          "cachedResultName": "cvs",
+          "cachedResultUrl": ""
+        },
+        "where": {
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "leftValue": "={{ $json.user_id }}",
+              "rightValue": "user_id",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        300
+      ],
+      "id": "postgres-fetch-user-cv",
+      "name": "Fetch User CV",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public.user_preferences",
+          "mode": "list",
+          "cachedResultName": "public.user_preferences",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.user_preferences",
+          "mode": "list",
+          "cachedResultName": "user_preferences",
+          "cachedResultUrl": ""
+        },
+        "where": {
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-1234-567890abcdeg",
+              "leftValue": "={{ $json.user_id }}",
+              "rightValue": "user_id",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        420
+      ],
+      "id": "postgres-fetch-user-preferences",
+      "name": "Fetch User Preferences",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8002/embed/query",
+        "sendHeaders": false,
+        "options": {
+          "body": {
+            "content": "={{ $('Fetch User CV')[0].json.parsed_content || $('Fetch User CV')[0].json.content }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1240,
+        300
+      ],
+      "id": "http-request-embed-cv",
+      "name": "Embed CV via Embedder Service",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8001/match",
+        "sendHeaders": false,
+        "options": {
+          "body": {
+            "content": "={{ JSON.stringify({\n  cv_embedding: $('Embed CV via Embedder Service')[0].json.embedding,\n  user_preferences: $('Fetch User Preferences')[0].json,\n  limit: 10\n}) }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1480,
+        300
+      ],
+      "id": "http-request-match-jobs",
+      "name": "Get Ranked Jobs via Matcher Service",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process the matched jobs and prepare for storage\nconst matchResponse = $input.first().json;\nconst user = $('Process Users')[0].json;\n\nconst processedMatches = [];\n\nif (matchResponse && matchResponse.jobs) {\n  for (const job of matchResponse.jobs) {\n    processedMatches.push({\n      json: {\n        user_id: user.user_id,\n        job_id: job.id,\n        score: job.score,\n        matched_at: new Date().toISOString(),\n        status: 'pending_notification',\n        user_email: user.email,\n        telegram_chat_id: user.telegram_chat_id,\n        job_title: job.title,\n        job_company: job.company,\n        job_url: job.job_url,\n        job_description: job.description\n      }\n    });\n  }\n}\n\nreturn processedMatches;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1720,
+        300
+      ],
+      "id": "function-process-matched-jobs",
+      "name": "Process Matched Jobs"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public.recommendations",
+          "mode": "list",
+          "cachedResultName": "public.recommendations",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.recommendations",
+          "mode": "list",
+          "cachedResultName": "recommendations",
+          "cachedResultUrl": ""
+        },
+        "values": {
+          "columns": {
+            "user_id": "={{ $json.user_id }}",
+            "job_id": "={{ $json.job_id }}",
+            "score": "={{ $json.score }}",
+            "matched_at": "={{ $json.matched_at }}",
+            "status": "={{ $json.status }}",
+            "job_title": "={{ $json.job_title }}",
+            "job_company": "={{ $json.job_company }}",
+            "job_url": "={{ $json.job_url }}",
+            "job_description": "={{ $json.job_description }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        1960,
+        300
+      ],
+      "id": "postgres-insert-recommendations",
+      "name": "Insert Recommendations to Supabase",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        300
+      ],
+      "id": "email-send-daily-jobs",
+      "name": "Send Daily Job Recommendations via Email",
+      "credentials": {
+        "smtp": {
+          "id": "2",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "to",
+              "value": "={{ $json.user_email }}"
+            },
+            {
+              "name": "subject",
+              "value": "Your Daily Job Recommendations - JobLens"
+            },
+            {
+              "name": "html",
+              "value": "={{ '<h2>Personalized Job Recommendations for ' + new Date().toLocaleDateString() + '</h2><br><br>' + \n$($input.all()).map(job => \n  '<div style=\"border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px;\">' +\n  '<h3><a href=\"' + job.json.job_url + '\" target=\"_blank\">' + job.json.job_title + '</a></h3>' +\n  '<p><strong>Company:</strong> ' + job.json.job_company + '</p>' +\n  '<p><strong>Match Score:</strong> ' + job.json.score + '/100</p>' +\n  '<p>' + (job.json.job_description ? job.json.job_description.substring(0, 200) + '...' : '') + '</p>' +\n  '</div>'\n).join('') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2200,
+        180
+      ],
+      "id": "set-email-content",
+      "name": "Set Email Content"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot<BOT_TOKEN>/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $json.telegram_chat_id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ 'JobLens Daily Recommendations (' + new Date().toLocaleDateString() + ')\\n\\n' + \n$($input.all()).map(job => \n  '职位: ' + job.json.job_title + '\\n' +\n  '公司: ' + job.json.job_company + '\\n' +\n  '匹配度: ' + job.json.score + '/100\\n' +\n  '链接: ' + job.json.job_url + '\\n\\n'\n).join('') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion:": 4.2,
+      "position": [
+        2200,
+        420
+      ],
+      "id": "http-request-send-telegram",
+      "name": "Send Telegram Notification",
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - Daily Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Users": {
+      "main": [
+        [
+          {
+            "node": "Process Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Users": {
+      "main": [
+        [
+          {
+            "node": "Fetch User CV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch User Preferences",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User CV": {
+      "main": [
+        [
+          {
+            "node": "Embed CV via Embedder Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch User Preferences": {
+      "main": [],
+      "main": [
+        [
+          {
+            "node": "Get Ranked Jobs via Matcher Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed CV via Embedder Service": {
+      "main": [
+        [
+          {
+            "node": "Get Ranked Jobs via Matcher Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Ranked Jobs via Matcher Service": {
+      "main": [
+        [
+          {
+            "node": "Process Matched Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Matched Jobs": {
+      "main": [
+        [
+          {
+            "node": "Insert Recommendations to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Recommendations to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Set Email Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Email Content": {
+      "main": [
+        [
+          {
+            "node": "Send Daily Job Recommendations via Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-23T10:00:00.000Z",
+  "versionId": "1.0.0",
+  "id": "daily-recommendation-workflow-1",
+  "meta": {
+    "instanceId": "12345"
+  },
+  "createdAt": "2025-12-23T10:00:00.000Z"
+}

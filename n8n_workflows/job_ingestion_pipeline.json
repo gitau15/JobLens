@@ -1,0 +1,868 @@
+{
+  "name": "Job Ingestion Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            },
+            {
+              "triggerAtHour": 12
+            },
+            {
+              "triggerAtHour": 18
+            },
+            {
+              "triggerAtHour": 0
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "id": "schedule-trigger-job-ingestion",
+      "name": "Schedule Trigger - Job Ingestion"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "source_name",
+              "value": "remotive"
+            },
+            {
+              "name": "max_jobs",
+              "value": 10
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        300
+      ],
+      "id": "set-remotive-params",
+      "name": "Set Remotive Params"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "source_name",
+              "value": "arbeitnow"
+            },
+            {
+              "name": "max_jobs",
+              "value": 10
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        420
+      ],
+      "id": "set-arbeitnow-params",
+      "name": "Set Arbeitnow Params"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/scrape",
+        "sendHeaders": false,
+        "response": {
+          "responseMode": "full"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "id": "http-request-remotive",
+      "name": "Scrape Remotive Jobs",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/scrape",
+        "sendHeaders": false,
+        "response": {
+          "responseMode": "full"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        420
+      ],
+      "id": "http-request-arbeitnow",
+      "name": "Scrape Arbeitnow Jobs",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+              "leftValue": "={{ $json.data }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ],
+      "id": "if-remotive-has-jobs",
+      "name": "Remotive Has Jobs?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-1234-567890abcdeg",
+              "leftValue": "={{ $json.data }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        420
+      ],
+      "id": "if-arbeitnow-has-jobs",
+      "name": "Arbeitnow Has Jobs?"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract jobs from scraper response\nconst scraperResponse = $input.all();\n\nconst jobs = [];\n\nfor (const item of scraperResponse) {\n  if (item.json && item.json.data && Array.isArray(item.json.data)) {\n    for (const job of item.json.data) {\n      // Add source info to each job\n      const jobWithSource = {\n        ...job,\n        source_name: job.source_name || 'remotive', // or 'arbeitnow'\n        scraped_at: new Date().toISOString(),\n        embedding_status: 'pending',\n        embedding_updated_at: null\n      };\n      \n      jobs.push({\n        json: jobWithSource\n      });\n    }\n  }\n}\n\nreturn jobs;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        300
+      ],
+      "id": "function-process-remotive-jobs",
+      "name": "Process Remotive Jobs"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract jobs from scraper response\nconst scraperResponse = $input.all();\n\nconst jobs = [];\n\nfor (const item of scraperResponse) {\n  if (item.json && item.json.data && Array.isArray(item.json.data)) {\n    for (const job of item.json.data) {\n      // Add source info to each job\n      const jobWithSource = {\n        ...job,\n        source_name: job.source_name || 'arbeitnow',\n        scraped_at: new Date().toISOString(),\n        embedding_status: 'pending',\n        embedding_updated_at: null\n      };\n      \n      jobs.push({\n        json: jobWithSource\n      });\n    }\n  }\n}\n\nreturn jobs;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        420
+      ],
+      "id": "function-process-arbeitnow-jobs",
+      "name": "Process Arbeitnow Jobs"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json.id || $json.job_url_hash }}"
+            },
+            {
+              "name": "source_name",
+              "value": "={{ $json.source_name }}"
+            },
+            {
+              "name": "external_id",
+              "value": "={{ $json.id || $json.job_url_hash }}"
+            },
+            {
+              "name": "job_url",
+              "value": "={{ $json.job_url }}"
+            },
+            {
+              "name": "job_url_hash",
+              "value": "={{ $json.job_url_hash }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "company",
+              "value": "={{ $json.company }}"
+            },
+            {
+              "name": "location",
+              "value": "={{ $json.location }}"
+            },
+            {
+              "name": "employment_type",
+              "value": "={{ $json.employment_type || '' }}"
+            },
+            {
+              "name": "remote_option",
+              "value": "={{ $json.remote_option || '' }}"
+            },
+            {
+              "name": "salary_min",
+              "value": "={{ $json.salary_min || null }}"
+            },
+            {
+              "name": "salary_max",
+              "value": "={{ $json.salary_max || null }}"
+            },
+            {
+              "name": "salary_currency",
+              "value": "={{ $json.salary_currency || '' }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.description }}"
+            },
+            {
+              "name": "requirements",
+              "value": "={{ $json.requirements || '' }}"
+            },
+            {
+              "name": "skills",
+              "value": "={{ $json.skills || '' }}"
+            },
+            {
+              "name": "posted_at",
+              "value": "={{ $json.posted_at || new Date().toISOString() }}"
+            },
+            {
+              "name": "scraped_at",
+              "value": "={{ $json.scraped_at }}"
+            },
+            {
+              "name": "is_active",
+              "value": "={{ $json.is_active !== undefined ? $json.is_active : true }}"
+            },
+            {
+              "name": "embedding_status",
+              "value": "={{ $json.embedding_status || 'pending' }}"
+            },
+            {
+              "name": "embedding_updated_at",
+              "value": "={{ $json.embedding_updated_at || null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1480,
+        300
+      ],
+      "id": "set-remotive-job-fields",
+      "name": "Format Remotive Job Fields"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json.id || $json.job_url_hash }}"
+            },
+            {
+              "name": "source_name",
+              "value": "={{ $json.source_name }}"
+            },
+            {
+              "name": "external_id",
+              "value": "={{ $json.id || $json.job_url_hash }}"
+            },
+            {
+              "name": "job_url",
+              "value": "={{ $json.job_url }}"
+            },
+            {
+              "name": "job_url_hash",
+              "value": "={{ $json.job_url_hash }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "company",
+              "value": "={{ $json.company }}"
+            },
+            {
+              "name": "location",
+              "value": "={{ $json.location }}"
+            },
+            {
+              "name": "employment_type",
+              "value": "={{ $json.employment_type || '' }}"
+            },
+            {
+              "name": "remote_option",
+              "value": "={{ $json.remote_option || '' }}"
+            },
+            {
+              "name": "salary_min",
+              "value": "={{ $json.salary_min || null }}"
+            },
+            {
+              "name": "salary_max",
+              "value": "={{ $json.salary_max || null }}"
+            },
+            {
+              "name": "salary_currency",
+              "value": "={{ $json.salary_currency || '' }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.description }}"
+            },
+            {
+              "name": "requirements",
+              "value": "={{ $json.requirements || '' }}"
+            },
+            {
+              "name": "skills",
+              "value": "={{ $json.skills || '' }}"
+            },
+            {
+              "name": "posted_at",
+              "value": "={{ $json.posted_at || new Date().toISOString() }}"
+            },
+            {
+              "name": "scraped_at",
+              "value": "={{ $json.scraped_at }}"
+            },
+            {
+              "name": "is_active",
+              "value": "={{ $json.is_active !== undefined ? $json.is_active : true }}"
+            },
+            {
+              "name": "embedding_status",
+              "value": "={{ $json.embedding_status || 'pending' }}"
+            },
+            {
+              "name": "embedding_updated_at",
+              "value": "={{ $json.embedding_updated_at || null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1480,
+        420
+      ],
+      "id": "set-arbeitnow-job-fields",
+      "name": "Format Arbeitnow Job Fields"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public.raw_jobs",
+          "mode": "list",
+          "cachedResultName": "public.raw_jobs",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.raw_jobs",
+          "mode": "list",
+          "cachedResultName": "raw_jobs",
+          "cachedResultUrl": ""
+        },
+        "values": {
+          "columns": {
+            "id": "={{ $json.id }}",
+            "source_name": "={{ $json.source_name }}",
+            "external_id": "={{ $json.external_id }}",
+            "job_url": "={{ $json.job_url }}",
+            "job_url_hash": "={{ $json.job_url_hash }}",
+            "title": "={{ $json.title }}",
+            "company": "={{ $json.company }}",
+            "location": "={{ $json.location }}",
+            "employment_type": "={{ $json.employment_type }}",
+            "remote_option": "={{ $json.remote_option }}",
+            "salary_min": "={{ $json.salary_min }}",
+            "salary_max": "={{ $json.salary_max }}",
+            "salary_currency": "={{ $json.salary_currency }}",
+            "description": "={{ $json.description }}",
+            "requirements": "={{ $json.requirements }}",
+            "skills": "={{ $json.skills }}",
+            "posted_at": "={{ $json.posted_at }}",
+            "scraped_at": "={{ $json.scraped_at }}",
+            "is_active": "={{ $json.is_active }}",
+            "embedding_status": "={{ $json.embedding_status }}",
+            "embedding_updated_at": "={{ $json.embedding_updated_at }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        1720,
+        300
+      ],
+      "id": "postgres-insert-remotive-jobs",
+      "name": "Insert Remotive Jobs to Supabase",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public.raw_jobs",
+          "mode": "list",
+          "cachedResultName": "public.raw_jobs",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.raw_jobs",
+          "mode": "list",
+          "cachedResultName": "raw_jobs",
+          "cachedResultUrl": ""
+        },
+        "values": {
+          "columns": {
+            "id": "={{ $json.id }}",
+            "source_name": "={{ $json.source_name }}",
+            "external_id": "={{ $json.external_id }}",
+            "job_url": "={{ $json.job_url }}",
+            "job_url_hash": "={{ $json.job_url_hash }}",
+            "title": "={{ $json.title }}",
+            "company": "={{ $json.company }}",
+            "location": "={{ $json.location }}",
+            "employment_type": "={{ $json.employment_type }}",
+            "remote_option": "={{ $json.remote_option }}",
+            "salary_min": "={{ $json.salary_min }}",
+            "salary_max": "={{ $json.salary_max }}",
+            "salary_currency": "={{ $json.salary_currency }}",
+            "description": "={{ $json.description }}",
+            "requirements": "={{ $json.requirements }}",
+            "skills": "={{ $json.skills }}",
+            "posted_at": "={{ $json.posted_at }}",
+            "scraped_at": "={{ $json.scraped_at }}",
+            "is_active": "={{ $json.is_active }}",
+            "embedding_status": "={{ $json.embedding_status }}",
+            "embedding_updated_at": "={{ $json.embedding_updated_at }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        1720,
+        420
+      ],
+      "id": "postgres-insert-arbeitnow-jobs",
+      "name": "Insert Arbeitnow Jobs to Supabase",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Collect all jobs that were successfully inserted\nconst insertedJobs = $input.all();\n\n// Group jobs by embedding_status\nconst pendingEmbeddingJobs = [];\n\nfor (const item of insertedJobs) {\n  if (item.json && item.json.embedding_status === 'pending') {\n    pendingEmbeddingJobs.push({\n      json: {\n        id: item.json.id,\n        title: item.json.title,\n        company: item.json.company,\n        description: item.json.description,\n        requirements: item.json.requirements,\n        skills: item.json.skills\n      }\n    });\n  }\n}\n\nreturn pendingEmbeddingJobs;"
+      },
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1960,
+        360
+      ],
+      "id": "function-collect-pending-embedding-jobs",
+      "name": "Collect Jobs for Embedding"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "jobs",
+              "value": "={{ $json }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2200,
+        360
+      ],
+      "id": "set-embed-jobs-payload",
+      "name": "Prepare Embedding Payload"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8002/embed/jobs",
+        "sendHeaders": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2440,
+        360
+      ],
+      "id": "http-request-embed-jobs",
+      "name": "Embed Jobs via Embedder Service",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "embedding_status",
+              "value": "embedded"
+            },
+            {
+              "name": "embedding_updated_at",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2680,
+        360
+      ],
+      "id": "set-embedding-status-updated",
+      "name": "Update Embedding Status"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "value": "public.raw_jobs",
+          "mode": "list",
+          "cachedResultName": "public.raw_jobs",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "public.raw_jobs",
+          "mode": "list",
+          "cachedResultName": "raw_jobs",
+          "cachedResultUrl": ""
+        },
+        "where": {
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-1234-567890abcdeh",
+              "leftValue": "={{ $('Collect Jobs for Embedding')[0].json.id }}",
+              "rightValue": "id",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "values": {
+          "columns": {
+            "embedding_status": "={{ $json.embedding_status }}",
+            "embedding_updated_at": "={{ $json.embedding_updated_at }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [
+        2920,
+        360
+      ],
+      "id": "postgres-update-embedding-status",
+      "name": "Update Job Embedding Status",
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - Job Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Set Remotive Params",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Arbeitnow Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Remotive Params": {
+      "main": [
+        [
+          {
+            "node": "Scrape Remotive Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Arbeitnow Params": {
+      "main": [
+        [
+          {
+            "node": "Scrape Arbeitnow Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Remotive Jobs": {
+      "main": [
+        [
+          {
+            "node": "Remotive Has Jobs?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Arbeitnow Jobs": {
+      "main": [
+        [
+          {
+            "node": "Arbeitnow Has Jobs?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remotive Has Jobs?": {
+      "main": [
+        [
+          {
+            "node": "Process Remotive Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arbeitnow Has Jobs?": {
+      "main": [
+        [
+          {
+            "node": "Process Arbeitnow Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Remotive Jobs": {
+      "main": [
+        [
+          {
+            "node": "Format Remotive Job Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Arbeitnow Jobs": {
+      "main": [
+        [
+          {
+            "node": "Format Arbeitnow Job Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Remotive Job Fields": {
+      "main": [
+        [
+          {
+            "node": "Insert Remotive Jobs to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Arbeitnow Job Fields": {
+      "main": [
+        [
+          {
+            "node": "Insert Arbeitnow Jobs to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Remotive Jobs to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Collect Jobs for Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Arbeitnow Jobs to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Collect Jobs for Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Jobs for Embedding": {
+      "main": [
+        [
+          {
+            "node": "Prepare Embedding Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Embedding Payload": {
+      "main": [
+        [
+          {
+            "node": "Embed Jobs via Embedder Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Jobs via Embedder Service": {
+      "main": [
+        [
+          {
+            "node": "Update Embedding Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Embedding Status": {
+      "main": [
+        [
+          {
+            "node": "Update Job Embedding Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-23T10:00:00.000Z",
+  "versionId": "1.0.0",
+  "id": "job-ingestion-workflow-1",
+  "meta": {
+    "instanceId": "12345"
+  },
+  "createdAt": "2025-12-23T10:00:00.000Z"
+}
