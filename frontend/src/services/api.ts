@@ -11,7 +11,7 @@ const scraperService = axios.create({
 
 const embedderService = axios.create({
   baseURL: import.meta.env.VITE_EMBEDDER_SERVICE_URL || 'http://localhost:8002',
-  timeout: 30000,
+  timeout: 60000,  // Increased timeout for file processing operations
   headers: {
     'Content-Type': 'application/json',
   },
@@ -143,6 +143,16 @@ export const api = {
     healthCheck: () => embedderService.get('/health'),
     embedJobs: (request: EmbedJobsRequest) => embedderService.post<EmbedJobsResponse>('/embed/jobs', request),
     embedQuery: (request: EmbedQueryRequest) => embedderService.post<EmbedQueryResponse>('/embed/query', request),
+    embedCV: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return embedderService.post<EmbedQueryResponse>('/embed/cv', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 120000, // Increase timeout to 120 seconds for file processing
+      });
+    },
   },
 
   // Matcher Service

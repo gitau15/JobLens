@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../services/api';
 
 const CvUpload = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -26,17 +27,11 @@ const CvUpload = () => {
     setError('');
 
     try {
-      // In a real implementation, we would upload the CV file to our backend
-      // For now, we'll simulate processing the CV and getting an embedding
-      // This would involve sending the file to an endpoint that extracts text
-      // and generates embeddings
-      
-      // For demonstration purposes, we'll create a placeholder embedding
-      // In reality, this would come from our backend processing service
-      const placeholderEmbedding = Array(384).fill(0.1);
+      // Send the file to the embedder service to get the embedding
+      const embeddingResponse = await api.embedder.embedCV(file);
       
       // Save the embedding to user profile or session for later use
-      localStorage.setItem('cvEmbedding', JSON.stringify(placeholderEmbedding));
+      localStorage.setItem('cvEmbedding', JSON.stringify(embeddingResponse.data.embedding));
       
       setMessage('CV uploaded and processed successfully!');
       
