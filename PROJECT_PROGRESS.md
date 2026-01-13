@@ -152,7 +152,7 @@
 
 ---
 
-## 🔴 Not Started (Next Steps)
+## 🔄 In Progress / Next Steps
 
 ### 1. **CV Parser Module**
 - [ ] PDF/DOCX upload support (`PyPDF2`, `python-docx`)
@@ -170,13 +170,19 @@
   - Send concise job list or link to UI
 
 ### 3. **Frontend Integration**
-- [ ] Connect frontend to backend services
-- [ ] Implement CV upload functionality
-- [ ] Connect to Supabase database
-- [ ] Integrate with matcher service for job recommendations
-- [ ] Add feedback collection (like/dislike buttons)
+- [x] Connect frontend to backend services
+- [x] Implement CV upload functionality
+- [x] Connect to Supabase database
+- [x] Integrate with matcher service for job recommendations
+- [x] Add feedback collection (like/dislike buttons)
 
-### 4. **Evaluation & Metrics**
+### 4. **Deployment**
+- [x] Create deployment configuration files
+- [x] Prepare Vercel deployment for frontend
+- [x] Create Dockerfiles for all services
+- [x] Document deployment process
+
+### 5. **Evaluation & Metrics**
 - [ ] Log all recommendations (job IDs, scores, timestamps)
 - [ ] Collect user feedback (like/dislike buttons in UI)
 - [ ] Implement metrics calculation:
@@ -277,9 +283,10 @@ d:\\FinalYear\\
 | **Phase 2: Database & Orchestration** (Supabase + n8n) | ✅ **100%** |
 | **Phase 3: Matching & Ranking** (Matcher service) | ✅ **100%** |
 | **Phase 4: Frontend** (React + Auth) | ✅ **100%** |
-| **Phase 5: Notifications** (Email + Telegram) | 🔴 **0%** |
-| **Phase 6: CV Parser** (PDF/DOCX processing) | 🔴 **0%** |
-| **Phase 7: Evaluation** (Metrics + Report) | 🔴 **0%** |
+| **Phase 5: Deployment** (Vercel + Docker) | ✅ **100%** |
+| **Phase 6: Notifications** (Email + Telegram) | 🔴 **0%** |
+| **Phase 7: CV Parser** (PDF/DOCX processing) | 🔴 **0%** |
+| **Phase 8: Evaluation** (Metrics + Report) | 🔴 **0%** |
 
 **Overall Project Completion**: ~70-75%
 
